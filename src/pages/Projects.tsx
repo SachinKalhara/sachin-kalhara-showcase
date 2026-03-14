@@ -1,77 +1,64 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Search, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ProjectCard from '@/components/ProjectCard';
-import project1 from '@/assets/project-1.jpg';
-import project2 from '@/assets/project-2.jpg';
-import project3 from '@/assets/project-3.jpg';
+
+interface BackendProject {
+  id: number;
+  title: string;
+  description: string;
+  imageUrl?: string;
+  technologies: string;
+  githubLink?: string;
+  demoLink?: string;
+  createdAt: string;
+}
+
+interface TransformedProject {
+  id: number;
+  title: string;
+  description: string;
+  image: string;
+  tags: string[];
+  demoUrl?: string;
+  githubUrl?: string;
+  category: string;
+}
 
 const Projects = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  const projects = [
-    {
-      title: 'Portfolio Website Design',
-      description: 'A modern, responsive portfolio website built with React and TypeScript. Features smooth animations, dark mode support, and optimized performance. The design emphasizes clean aesthetics while maintaining excellent user experience across all devices.',
-      image: project1,
-      tags: ['UI/UX', 'React', 'TypeScript', 'Responsive'],
-      category: 'Web Design',
-      demoUrl: 'https://example.com/portfolio',
-      githubUrl: 'https://github.com/sachinkalhara/portfolio'
+  const { data: projects = [], isLoading, error } = useQuery({
+    queryKey: ['projects'],
+    queryFn: async () => {
+      const response = await fetch('http://localhost:8080/api/projects');
+      if (!response.ok) throw new Error('Failed to fetch projects');
+      return response.json();
     },
-    {
-      title: 'Mobile App UI Design',
-      description: 'Comprehensive mobile application interface designed for both iOS and Android platforms. Includes user research, wireframing, prototyping, and final UI implementation with attention to platform-specific design guidelines.',
-      image: project2,
-      tags: ['Mobile Design', 'Figma', 'Prototyping', 'User Research'],
-      category: 'Mobile Design',
-      demoUrl: 'https://example.com/mobile-app'
-    },
-    {
-      title: 'E-commerce Web Application',
-      description: 'Full-stack e-commerce solution with modern design, secure payment integration, inventory management, and admin dashboard. Built with React, Node.js, and MongoDB with Stripe payment processing.',
-      image: project3,
-      tags: ['Full Stack', 'E-commerce', 'Payment Integration', 'Admin Dashboard'],
-      category: 'Web Development',
-      demoUrl: 'https://example.com/ecommerce',
-      githubUrl: 'https://github.com/sachinkalhara/ecommerce'
-    },
-    {
-      title: 'Brand Identity Design',
-      description: 'Complete brand identity package including logo design, color palette, typography system, and brand guidelines. Created for a tech startup focusing on sustainable solutions and modern aesthetics.',
-      image: project1,
-      tags: ['Branding', 'Logo Design', 'Adobe Illustrator', 'Brand Guidelines'],
-      category: 'Branding',
-      demoUrl: 'https://example.com/brand-identity'
-    },
-    {
-      title: 'SaaS Dashboard Design',
-      description: 'Enterprise-level dashboard interface for a SaaS platform. Features complex data visualization, user management, analytics reporting, and customizable widgets with focus on usability and scalability.',
-      image: project2,
-      tags: ['SaaS', 'Dashboard', 'Data Visualization', 'Enterprise'],
-      category: 'Web Design',
-      demoUrl: 'https://example.com/saas-dashboard',
-      githubUrl: 'https://github.com/sachinkalhara/saas-dashboard'
-    },
-    {
-      title: 'Mobile Game UI Design',
-      description: 'Engaging user interface design for a mobile gaming application. Includes game menus, HUD elements, character selection screens, and in-game UI components optimized for touch interactions.',
-      image: project3,
-      tags: ['Game UI', 'Mobile Gaming', 'Character Design', 'Interactive Design'],
-      category: 'Mobile Design',
-      demoUrl: 'https://example.com/game-ui'
-    }
-  ];
+  });
 
-  const categories = ['All', ...Array.from(new Set(projects.map(project => project.category)))];
+  if (isLoading) return <div className="min-h-screen pt-20 flex items-center justify-center">Loading...</div>;
+  if (error) return <div className="min-h-screen pt-20 flex items-center justify-center">Error loading projects</div>;
 
-  const filteredProjects = projects.filter(project => {
+  const transformedProjects = projects.map(project => ({
+    ...project,
+    image: project.imageUrl || '/placeholder.svg',
+    tags: project.technologies ? project.technologies.split(',').map(tag => tag.trim()).filter(Boolean) : [],
+    demoUrl: project.demoLink,
+    githubUrl: project.githubLink,
+    category: project.technologies ? project.technologies.split(',')[0]?.trim() || 'Other' : 'Other'
+  }));
+
+  const categories = ['All', ...Array.from(new Set(transformedProjects.map(project => project.category)))];
+
+  const filteredProjects = transformedProjects.filter((project: TransformedProject) => {
     const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+                         project.tags.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'All' || project.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -101,14 +88,14 @@ const Projects = () => {
                 type="text"
                 placeholder="Search projects..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => setSearchTerm((e.target as HTMLInputElement).value)}
                 className="pl-10 shadow-soft"
               />
             </div>
 
             {/* Category Filters */}
             <div className="flex flex-wrap gap-2">
-              {categories.map(category => (
+              {categories.map((category: string) => (
                 <Button
                   key={category}
                   variant={selectedCategory === category ? "default" : "outline"}
@@ -130,7 +117,7 @@ const Projects = () => {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
             <p className="text-muted-foreground">
-              Showing {filteredProjects.length} of {projects.length} projects
+              Showing {filteredProjects.length} of {transformedProjects.length} projects
             </p>
           </div>
           
@@ -151,11 +138,11 @@ const Projects = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredProjects.map((project, index) => (
-                <div 
-                  key={index} 
-                  className="animate-scale-in" 
-                  style={{ animationDelay: `${index * 0.1}s` }}
+              {filteredProjects.map((project) => (
+                <div
+                  key={project.id}
+                  className="animate-scale-in"
+                  style={{ animationDelay: `${Math.random() * 0.3}s` }}
                 >
                   <ProjectCard {...project} />
                 </div>
@@ -176,10 +163,10 @@ const Projects = () => {
           </div>
           
           <div className="flex flex-wrap gap-3 justify-center">
-            {Array.from(new Set(projects.flatMap(project => project.tags))).map((tag, index) => (
-              <Badge 
-                key={tag} 
-                variant="secondary" 
+            {Array.from(new Set(transformedProjects.flatMap(project => project.tags))).map((tag: string, index: number) => (
+              <Badge
+                key={tag}
+                variant="secondary"
                 className="px-4 py-2 text-sm font-medium transition-bounce hover:scale-105 hover:shadow-soft animate-fade-in"
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
